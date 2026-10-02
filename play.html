@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mime Party — Charades & Pictionary</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Figtree:wght@400;520;650&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root {
+    --bg: #0c0b10;
+    --elev: #16141c;
+    --elev2: #201d28;
+    --line: rgba(255,255,255,.08);
+    --paper: #f4efe6;
+    --ink: #1a1714;
+    --muted: #a39bb0;
+    --gold: #e4b15a;
+    --crimson: #e23d4a;
+    --teal: #3dbeb6;
+    --a: #e25b6a;
+    --b: #5aa7e4;
+    --ok: #7dcea0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--paper); font-family: Figtree, sans-serif; }
+  button, input, select, textarea { font-family: inherit; }
+  button { cursor: pointer; }
+  h1, h2, h3 { font-family: Fraunces, serif; font-weight: 650; margin: 0; }
+  .app { min-height: 100%; display: flex; flex-direction: column; }
+  header.top {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 14px 22px; border-bottom: 1px solid var(--line); background: rgba(12,11,16,.9);
+    position: sticky; top: 0; z-index: 5; backdrop-filter: blur(10px);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .mark {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: conic-gradient(from 120deg, var(--crimson), var(--gold), var(--teal), var(--crimson));
+    display: grid; place-items: center; color: #111; font-family: Fraunces, serif; font-weight: 650;
+  }
+  .brand small { display: block; color: var(--muted); letter-spacing: .12em; text-transform: uppercase; font-size: 10px; }
+  .pill { border: 1px solid var(--line); background: var(--elev); border-radius: 999px; padding: 6px 12px; color: var(--muted); font-size: 13px; }
+  .pill strong { color: var(--paper); letter-spacing: .08em; }
+  main { flex: 1; padding: 22px; max-width: 1240px; margin: 0 auto; width: 100%; }
+  .gate { display: grid; grid-template-columns: 1.1fr .9fr; gap: 28px; align-items: center; min-height: calc(100vh - 120px); }
+  .hero h1 { font-size: clamp(42px, 6vw, 76px); line-height: .92; letter-spacing: -0.03em; }
+  .hero p.lede { color: var(--muted); font-size: 18px; max-width: 520px; }
+  .card { background: var(--elev); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 6px; letter-spacing: .04em; text-transform: uppercase; }
+  input, select, textarea {
+    width: 100%; background: var(--bg); color: var(--paper); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; font-size: 15px;
+  }
+  textarea { min-height: 72px; resize: vertical; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  .btn {
+    border: 0; border-radius: 12px; padding: 11px 14px; font-weight: 650; background: var(--paper); color: var(--ink);
+  }
+  .btn.gold { background: var(--gold); }
+  .btn.ghost { background: transparent; color: var(--paper); border: 1px solid var(--line); }
+  .btn.danger { background: var(--crimson); color: white; }
+  .btn.teal { background: var(--teal); color: #08211f; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .layout { display: grid; grid-template-columns: 270px 1fr 300px; gap: 14px; }
+  .team { border-radius: 16px; padding: 12px; background: var(--elev); border: 1px solid var(--line); margin-bottom: 10px; }
+  .team.A { box-shadow: inset 3px 0 0 var(--a); }
+  .team.B { box-shadow: inset 3px 0 0 var(--b); }
+  .team header { display: flex; justify-content: space-between; align-items: baseline; }
+  .score { font-family: Fraunces, serif; font-size: 32px; }
+  .player { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .player .meta { color: var(--muted); font-size: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #665; margin-right: 6px; }
+  .dot.on { background: var(--ok); }
+  .stage { background: var(--elev); border: 1px solid var(--line); border-radius: 18px; min-height: 520px; display: flex; flex-direction: column; overflow: hidden; }
+  .stage-bar { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .modes { display: flex; gap: 6px; }
+  .modes button, .tiny { border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--paper); padding: 6px 10px; font-size: 13px; }
+  .modes button.on { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+  .board { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; background: #09080d; }
+  .board.solo { grid-template-columns: 1fr; }
+  video, canvas { width: 100%; height: 360px; background: #111; border-radius: 12px; object-fit: cover; }
+  canvas { background: #f7f1e6; touch-action: none; cursor: crosshair; }
+  .tools { display: flex; gap: 6px; align-items: center; padding: 0 10px 10px; }
+  .swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; }
+  .swatch.on { border-color: white; }
+  .side .secret {
+    background: var(--paper); color: var(--ink); border-radius: 16px; padding: 14px; margin-bottom: 10px;
+  }
+  .side .secret.hidden { background: var(--elev2); color: var(--muted); }
+  .secret .word { font-family: Fraunces, serif; font-size: 28px; line-height: 1.1; }
+  .timer { font-variant-numeric: tabular-nums; font-family: Fraunces, serif; font-size: 42px; }
+  .guess-log { max-height: 160px; overflow: auto; font-size: 14px; }
+  .guess-log div { padding: 4px 0; border-bottom: 1px solid var(--line); }
+  .banner { background: #2a2418; color: var(--gold); border-radius: 12px; padding: 8px 12px; margin-bottom: 10px; font-size: 14px; }
+  .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: grid; place-items: center; z-index: 20; padding: 16px; }
+  .modal { width: min(520px, 100%); background: var(--elev); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+  .votes { display: flex; gap: 8px; margin: 8px 0; }
+  footer.note { color: var(--muted); font-size: 12px; padding: 8px 22px 18px; }
+  @media (max-width: 980px) {
+    .gate, .layout { grid-template-columns: 1fr; }
+    .board { grid-template-columns: 1fr; }
+    video, canvas { height: 240px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="mark">M</div>
+      <div><small>Live party</small><strong>Mime Party</strong></div>
+    </div>
+    <div id="topMeta" class="pill">4–20 players · no game server</div>
+  </header>
+  <main id="root"></main>
+  <footer class="note">Video uses WebRTC between browsers. PeerJS Cloud only introduces peers. Camera needs HTTPS.</footer>
+</div>
+<script>
+const WORDS = {
+  Actions: ["tightrope walking","milking a cow","parallel parking","flipping a pancake","conducting an orchestra","changing a diaper","assembling furniture","surfing a wave","tying a necktie","blowing a bubble"],
+  Animals: ["penguin","octopus","giraffe","sloth","flamingo","hedgehog","kangaroo","chameleon","narwhal","platypus"],
+  Movies: ["Jaws","The Wizard of Oz","Titanic","Jurassic Park","Star Wars","Frozen","The Matrix","Home Alone","Finding Nemo","E.T."],
+  Food: ["spaghetti","sushi","popcorn","banana split","s'more","tacos","milkshake","watermelon","birthday cake","hot dog"],
+  Places: ["library","airport","circus","submarine","haunted house","laundromat","campfire","elevator","desert island","bowling alley"],
+  Objects: ["umbrella","telescope","rubber duck","hourglass","trampoline","boomerang","typewriter","compass","anchor","kite"],
+  Hard: ["nostalgia","déjà vu","procrastination","gravity","wifi","inflation","charisma","déjà brew","middle seat","group chat"]
+};
+const MIN_PLAYERS = 4, MAX_PLAYERS = 20;
+const uid = () => crypto.randomUUID();
+const store = {
+  get playerId() { let id = localStorage.getItem("mp-player"); if (!id) { id = uid(); localStorage.setItem("mp-player", id); } return id; },
+  name: localStorage.getItem("mp-name") || "",
+  room: localStorage.getItem("mp-room") || ""
+};
+function saveName(n) { localStorage.setItem("mp-name", n); }
+function saveRoom(r) { localStorage.setItem("mp-room", r); }
+
+const PEER_OPTS = {
+  host: "0.peerjs.com",
+  port: 443,
+  path: "/peerjs",
+  secure: true,
+  key: "peerjs",
+  debug: 1
+};
+const S = {
+  role: null, room: "", peer: null, conn: null, conns: new Map(), calls: new Map(),
+  localStream: null, name: store.name, playerId: store.playerId,
+  state: null, modePick: "charades", color: "#1a1714", size: 4, drawing: false, stroke: null,
+  challengeReason: "Said the word", log: []
+};
+
+function beep(freq=660, dur=0.12) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.frequency.value = freq; o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.05, ctx.currentTime);
+    o.start(); o.stop(ctx.currentTime + dur);
+  } catch (e) {}
+}
+
+function root() { return document.getElementById("root"); }
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c])); }
+
+function render() {
+  const meta = document.getElementById("topMeta");
+  if (!S.state) {
+    meta.textContent = "4–20 players · no game server";
+    root().innerHTML = gateHTML();
+    bindGate();
+    return;
+  }
+  const st = S.state;
+  meta.innerHTML = `Room <strong>${esc(S.room)}</strong> · ${st.players.filter(p=>p.connected).length}/${st.players.length} live`;
+  root().innerHTML = boardHTML(st);
+  bindBoard();
+}
+
+function gateHTML() {
+  return `<section class="gate">
+    <div class="hero">
+      <h1>Act it. Draw it. Or both.</h1>
+      <p class="lede">A party room for charades, Pictionary, and combo turns. The other team can see the secret. Cheating can be challenged. Scores survive a refresh.</p>
+      <p class="lede">Share one room code. The party leader’s browser keeps score. Everyone else’s video and guesses travel peer-to-peer.</p>
+    </div>
+    <div class="card">
+      <label>Your name</label>
+      <input id="name" maxlength="22" value="${esc(S.name)}" placeholder="Name the room will see" />
+      <div class="row">
+        <div>
+          <label>Join code</label>
+          <input id="code" maxlength="5" value="${esc(store.room)}" placeholder="ABCDE" style="text-transform:uppercase" />
+        </div>
+        <div>
+          <label>Team</label>
+          <select id="team"><option value="">Auto</option><option>A</option><option>B</option></select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn gold" id="create">Create party</button>
+        <button class="btn" id="join">Join</button>
+      </div>
+      <p id="gateErr" style="color:var(--crimson);min-height:1.2em"></p>
+    </div>
+  </section>`;
+}
+
+function me(st) { return st.players.find(p => p.id === S.playerId); }
+function isLeader(st) { const m = me(st); return m && m.leader; }
+function canSeeWord(st) {
+  const m = me(st); if (!m || !st.turn) return false;
+  if (st.phase === "challenge") return true;
+  if (m.id === st.turn.actorId) return true;
+  if (m.team && m.team !== st.turn.team) return true;
+  if (m.leader) return true;
+  return false;
+}
+
+function boardHTML(st) {
+  const m = me(st);
+  const teams = ["A","B"].map(t => {
+    const ps = st.players.filter(p => p.team === t);
+    return `<div class="team ${t}"><header><div><strong>Team ${t}</strong><div class="meta" style="color:var(--muted)">${ps.filter(p=>p.connected).length} live</div></div><div class="score">${st.scores[t]||0}</div></header>
+      ${ps.map(p => `<div class="player"><div><span class="dot ${p.connected?'on':''}"></span>${esc(p.name)}${p.leader?' · leader':''}${p.id===st.turn?.actorId?' · up':''}</div><span class="meta">${p.connected?'in':'away'}</span></div>`).join("") || `<div class="player"><span class="meta">Empty seat</span></div>`}
+    </div>`;
+  }).join("");
+  const see = canSeeWord(st);
+  const wordBlock = st.turn ? `<div class="secret ${see?'':'hidden'}"><div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase">${see?'Secret':'Secret hidden'}</div><div class="word">${see?esc(st.turn.word):'••••'}</div><div>${esc(st.turn.category)} · ${esc(st.turn.mode)}</div></div>` : `<div class="secret hidden"><div class="word">Lobby</div><div>Need ${MIN_PLAYERS}–${MAX_PLAYERS} players. Teams should both have people.</div></div>`;
+  const actor = st.players.find(p => p.id === st.turn?.actorId);
+  const showDraw = st.turn && (st.turn.mode === "pictionary" || st.turn.mode === "combo");
+  const showVid = !st.turn || st.turn.mode !== "pictionary";
+  const left = Math.max(0, Math.ceil(((st.turn?.endsAt || 0) - Date.now())/1000));
+  return `<div class="layout">
+    <div>${st.banner?`<div class="banner">${esc(st.banner)}</div>`:''}${teams}
+      <div class="card">
+        <label>Display name</label>
+        <input id="rename" value="${esc(m?.name||S.name)}" />
+        <div class="row" style="margin-top:8px">
+          <button class="btn ghost" id="setName">Update</button>
+          <button class="btn ghost" id="leave">Leave</button>
+        </div>
+      </div>
+    </div>
+    <section class="stage">
+      <div class="stage-bar">
+        <div><strong>${st.phase==='play'||st.phase==='challenge' ? `Team ${st.turn.team} · ${esc(actor?.name||'actor')}` : 'Stage'}</strong>
+          <div style="color:var(--muted);font-size:13px">${st.phase}</div></div>
+        <div class="timer" id="timer">${st.turn? left : '—'}</div>
+      </div>
+      <div class="board ${showDraw&&showVid?'':'solo'}" id="board">
+        ${showVid?`<video id="stageVideo" autoplay playsinline></video>`:''}
+        ${showDraw?`<canvas id="pad" width="900" height="600"></canvas>`:''}
+      </div>
+      ${showDraw && m && st.turn && m.id===st.turn.actorId ? `<div class="tools">
+        ${['#1a1714','#e23d4a','#e4b15a','#3dbeb6','#5aa7e4','#f4efe6'].map(c=>`<button class="swatch ${S.color===c?'on':''}" data-color="${c}" style="background:${c}"></button>`).join('')}
+        <button class="tiny" id="undo">Undo</button>
+        <button class="tiny" id="clearPad">Clear</button>
+      </div>`:''}
+      <div class="stage-bar">
+        ${isLeader(st) && st.phase==='lobby' ? `<div class="modes">
+          <button data-mode="charades" class="${S.modePick==='charades'?'on':''}">Charades</button>
+          <button data-mode="pictionary" class="${S.modePick==='pictionary'?'on':''}">Pictionary</button>
+          <button data-mode="combo" class="${S.modePick==='combo'?'on':''}">Combo</button>
+        </div>
+        <button class="btn gold" id="start" ${st.players.filter(p=>p.connected).length<MIN_PLAYERS?'disabled':''}>Start round</button>` : ''}
+        ${st.phase==='play' && m && m.team===st.turn.team && m.id!==st.turn.actorId ? `<input id="guess" placeholder="Type a guess" /><button class="btn" id="sendGuess">Guess</button>` : ''}
+        ${st.phase==='play' && m && (m.id===st.turn.actorId || m.leader) ? `<button class="btn teal" id="correct">Correct</button><button class="btn ghost" id="skip">Skip</button>` : ''}
+        ${st.phase==='play' ? `<button class="btn danger" id="challenge">Challenge</button>` : ''}
+        ${st.phase==='between' && isLeader(st) ? `<button class="btn gold" id="next">Next turn</button>` : ''}
+      </div>
+    </section>
+    <aside class="side">
+      ${wordBlock}
+      <div class="card">
+        <strong>Guesses</strong>
+        <div class="guess-log">${(st.guesses||[]).slice(-8).reverse().map(g=>`<div><strong>${esc(g.name)}</strong> ${esc(g.text)}</div>`).join('')||'<div style="color:var(--muted)">None yet</div>'}</div>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <strong>House rules</strong>
+        <p style="color:var(--muted);font-size:14px">Opposing team and the actor see the word. Saying it, spelling it, or pointing is challengeable. The party leader rules after the room votes.</p>
+        ${isLeader(st)?`<button class="btn ghost" id="shuffle">Balance teams</button>`:''}
+      </div>
+    </aside>
+  </div>
+  ${st.phase==='challenge'?challengeHTML(st):''}`;
+}
+
+function challengeHTML(st) {
+  const c = st.challenge;
+  const tally = (c.votes||[]).reduce((a,v)=>{a[v.vote]=(a[v.vote]||0)+1;return a;},{});
+  const m = me(st);
+  return `<div class="modal-back"><div class="modal">
+    <h2>Challenge</h2>
+    <p>${esc(c.byName)} says: ${esc(c.reason)}</p>
+    <p style="color:var(--muted)">Word was <strong style="color:var(--paper)">${esc(st.turn.word)}</strong></p>
+    <div class="votes"><span class="pill">Uphold ${tally.uphold||0}</span><span class="pill">Dismiss ${tally.dismiss||0}</span></div>
+    ${m && !c.votes.find(v=>v.id===m.id) ? `<div class="row"><button class="btn danger" id="voteUp">Uphold</button><button class="btn ghost" id="voteDown">Dismiss</button></div>` : `<p>Your vote is in.</p>`}
+    ${isLeader(st) ? `<label>Party leader ruling</label>
+      <div class="row"><button class="btn" data-rule="no-point">No point</button><button class="btn teal" data-rule="award">Award</button></div>
+      <div class="row" style="margin-top:8px"><button class="btn" data-rule="steal">Steal</button><button class="btn danger" data-rule="penalty">−1</button></div>` : `<p style="color:var(--muted)">Waiting on the party leader.</p>`}
+  </div></div>`;
+}
+
+function bindGate() {
+  document.getElementById("create").onclick = () => {
+    const name = document.getElementById("name").value.trim();
+    if (!name) return err("Name yourself first.");
+    S.name = name; saveName(name);
+    err("Opening room…");
+    const code = Math.random().toString(36).slice(2,7).toUpperCase();
+    hostRoom(code);
+  };
+  document.getElementById("join").onclick = () => {
+    const name = document.getElementById("name").value.trim();
+    const code = document.getElementById("code").value.trim().toUpperCase();
+    if (!name || code.length < 4) return err("Name and a room code.");
+    S.name = name; saveName(name);
+    err("Joining " + code + "…");
+    joinRoom(code, document.getElementById("team").value);
+  };
+}
+function prettyPeerError(e) {
+  const type = e && e.type;
+  if (type === "peer-unavailable") return "Room is not open. The host has to create the party first, then you join that code.";
+  if (type === "unavailable-id") return "That room code is already live in another tab. Close the other host tab, or create a new party.";
+  if (type === "network" || type === "server-error" || type === "socket-error") return "Could not reach the introduction server (PeerJS). Refresh and try again.";
+  return (e && e.message) || "Connection failed.";
+}
+function err(t) {
+  const n = document.getElementById("gateErr");
+  if (n) n.textContent = t;
+  else {
+    const b = document.createElement("div");
+    b.className = "banner";
+    b.textContent = t;
+    document.getElementById("root").prepend(b);
+  }
+}
+
+function hostRoom(code) {
+  S.role = "host"; S.room = code; saveRoom(code);
+  const peer = new Peer("mp" + code.toLowerCase(), PEER_OPTS);
+  S.peer = peer;
+  peer.on("open", () => {
+    S.state = freshState();
+    S.state.players.push({id:S.playerId, name:S.name, team:"A", connected:true, leader:true, peerId:peer.id});
+    render(); bindBoard();
+  });
+  peer.on("connection", conn => wireGuest(conn));
+  peer.on("call", call => answerCall(call));
+  peer.on("error", e => err(prettyPeerError(e)));
+}
+
+function freshState() {
+  return { phase:"lobby", players:[], scores:{A:0,B:0}, turn:null, guesses:[], strokes:[], challenge:null, banner:"", turnQueue:[] };
+}
+
+function wireGuest(conn) {
+  conn.on("data", msg => onGuestMsg(conn, msg));
+  conn.on("close", () => {
+    const p = S.state.players.find(x => x.peerId === conn.peer);
+    if (p) p.connected = false;
+    S.conns.delete(conn.peer);
+    broadcast();
+  });
+}
+
+function onGuestMsg(conn, msg) {
+  if (msg.t === "hello") {
+    let p = S.state.players.find(x => x.id === msg.playerId);
+    if (!p) {
+      if (S.state.players.length >= MAX_PLAYERS) return conn.send({t:"full"});
+      const counts = {A:0,B:0};
+      S.state.players.forEach(x => counts[x.team]++);
+      const team = msg.teamPref || (counts.A<=counts.B?"A":"B");
+      p = {id:msg.playerId, name:msg.name.slice(0,22), team, connected:true, leader:false, peerId:conn.peer};
+      S.state.players.push(p);
+      S.state.banner = `${p.name} joined`;
+    } else {
+      p.connected = true; p.peerId = conn.peer; p.name = msg.name.slice(0,22);
+      S.state.banner = `${p.name} reconnected`;
+    }
+    S.conns.set(conn.peer, conn);
+    broadcast();
+  }
+  if (!S.state) return;
+  const p = S.state.players.find(x => x.id === msg.playerId);
+  if (!p) return;
+  if (msg.t === "guess" && S.state.phase==="play" && p.team===S.state.turn.team && p.id!==S.state.turn.actorId) {
+    S.state.guesses.push({name:p.name, text:String(msg.text).slice(0,80)});
+    broadcast();
+  }
+  if (msg.t === "stroke") { S.state.strokes.push(msg.stroke); broadcast(); }
+  if (msg.t === "clear") { S.state.strokes = []; broadcast(); }
+  if (msg.t === "undo") { S.state.strokes.pop(); broadcast(); }
+  if (msg.t === "challenge" && S.state.phase==="play") openChallenge(p, msg.reason);
+  if (msg.t === "vote" && S.state.phase==="challenge") {
+    S.state.challenge.votes = S.state.challenge.votes.filter(v => v.id !== p.id).concat([{id:p.id, vote:msg.vote}]);
+    broadcast();
+  }
+  if (msg.t === "rename") { p.name = String(msg.name).slice(0,22); broadcast(); }
+  if (msg.t === "correct" && S.state.phase==="play" && (p.id===S.state.turn.actorId || p.leader)) award();
+  if (msg.t === "skip" && S.state.phase==="play" && (p.id===S.state.turn.actorId || p.leader)) endTurn("Skipped");
+}
+
+function broadcast() {
+  if (S.role !== "host") return;
+  const pub = publicState();
+  for (const [peerId, conn] of S.conns) {
+    const p = S.state.players.find(x => x.peerId === peerId);
+    if (conn.open) conn.send({t:"state", state: viewFor(pub, p)});
+  }
+  S.state = pub;
+  render();
+  paint();
+  attachVideo();
+}
+
+function publicState() { return JSON.parse(JSON.stringify(S.state)); }
+function viewFor(st, p) {
+  const copy = JSON.parse(JSON.stringify(st));
+  if (!copy.turn) return copy;
+  const see = p && (copy.phase==="challenge" || p.id===copy.turn.actorId || (p.team && p.team!==copy.turn.team) || p.leader);
+  if (!see) copy.turn.word = "";
+  return copy;
+}
+
+function joinRoom(code, teamPref) {
+  S.role = "guest"; S.room = code; saveRoom(code);
+  const peer = new Peer(undefined, PEER_OPTS);
+  S.peer = peer;
+  peer.on("open", () => {
+    const conn = peer.connect("mp"+code.toLowerCase(), {reliable:true});
+    S.conn = conn;
+    conn.on("open", () => conn.send({t:"hello", playerId:S.playerId, name:S.name, teamPref}));
+    conn.on("data", msg => {
+      if (msg.t === "full") return err("Room is full (20).");
+      if (msg.t === "state") { S.state = msg.state; render(); }
+    });
+    conn.on("close", () => { S.state = S.state || {banner:""}; if (S.state) S.state.banner = "Disconnected — rejoining"; render(); setTimeout(()=>joinRoom(code, teamPref), 1200); });
+  });
+  peer.on("call", call => answerCall(call));
+  peer.on("error", e => err(prettyPeerError(e)));
+}
+
+function send(msg) {
+  msg.playerId = S.playerId;
+  if (S.role === "host") onGuestMsg({peer:"local"}, msg);
+  else if (S.conn && S.conn.open) S.conn.send(msg);
+}
+
+function bindBoard() {
+  if (!S.state) { bindGate(); return; }
+  document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { S.modePick = b.dataset.mode; render(); });
+  const start = document.getElementById("start");
+  if (start) start.onclick = () => { if (S.role==="host") startRound(); else send({t:"start"}); };
+  const next = document.getElementById("next");
+  if (next) next.onclick = () => { if (S.role==="host") nextTurn(); };
+  const g = document.getElementById("sendGuess");
+  if (g) g.onclick = () => { const v = document.getElementById("guess").value.trim(); if (v) send({t:"guess", text:v}); };
+  const correct = document.getElementById("correct");
+  if (correct) correct.onclick = () => { if (S.role==="host") award(); else send({t:"correct"}); };
+  const skip = document.getElementById("skip");
+  if (skip) skip.onclick = () => { if (S.role==="host") endTurn("Skipped"); else send({t:"skip"}); };
+  const ch = document.getElementById("challenge");
+  if (ch) ch.onclick = () => send({t:"challenge", reason: prompt("Why challenge? Said the word, spelled it, pointed, other hint…", "Said the word") || "Said the word"});
+  document.getElementById("voteUp")?.addEventListener("click", () => send({t:"vote", vote:"uphold"}));
+  document.getElementById("voteDown")?.addEventListener("click", () => send({t:"vote", vote:"dismiss"}));
+  document.querySelectorAll("[data-rule]").forEach(b => b.onclick = () => { if (S.role==="host") rule(b.dataset.rule); });
+  document.getElementById("setName")?.addEventListener("click", () => send({t:"rename", name: document.getElementById("rename").value.trim() || S.name}));
+  document.getElementById("leave")?.addEventListener("click", () => location.reload());
+  document.getElementById("shuffle")?.addEventListener("click", () => { if (S.role==="host") balance(); });
+  document.querySelectorAll(".swatch").forEach(b => b.onclick = () => { S.color = b.dataset.color; render(); });
+  document.getElementById("undo")?.addEventListener("click", () => send({t:"undo"}));
+  document.getElementById("clearPad")?.addEventListener("click", () => send({t:"clear"}));
+  const pad = document.getElementById("pad");
+  if (pad && me(S.state)?.id === S.state.turn?.actorId) bindPad(pad);
+  paint(); attachVideo();
+}
+
+function balance() {
+  const live = S.state.players.filter(p => p.connected);
+  live.forEach((p,i) => p.team = i % 2 ? "B" : "A");
+  broadcast();
+}
+
+function startRound() {
+  const live = S.state.players.filter(p => p.connected);
+  if (live.length < MIN_PLAYERS) return;
+  S.state.turnQueue = live.map(p => p.id);
+  S.state.phase = "between";
+  nextTurn();
+}
+function nextTurn() {
+  if (!S.state.turnQueue.length) S.state.turnQueue = S.state.players.filter(p=>p.connected).map(p=>p.id);
+  const actorId = S.state.turnQueue.shift();
+  const actor = S.state.players.find(p => p.id === actorId);
+  if (!actor) return nextTurn();
+  const cats = Object.keys(WORDS);
+  const category = cats[Math.floor(Math.random()*cats.length)];
+  const word = WORDS[category][Math.floor(Math.random()*WORDS[category].length)];
+  S.state.turn = { team: actor.team, actorId, mode: S.modePick, word, category, endsAt: Date.now()+90000 };
+  S.state.guesses = []; S.state.strokes = []; S.state.challenge = null; S.state.phase = "play";
+  S.state.banner = `${actor.name} is up for Team ${actor.team}`;
+  broadcast();
+}
+function award() {
+  if (!S.state.turn) return;
+  S.state.scores[S.state.turn.team] += 1;
+  endTurn("Point to Team " + S.state.turn.team);
+}
+function endTurn(msg) {
+  S.state.phase = "between"; S.state.banner = msg; S.state.challenge = null;
+  broadcast();
+}
+function openChallenge(p, reason) {
+  S.state.phase = "challenge";
+  S.state.challenge = { by: p.id, byName: p.name, reason, votes: [] };
+  S.state.banner = "Challenge in progress";
+  broadcast();
+}
+function rule(kind) {
+  const team = S.state.turn.team;
+  const other = team === "A" ? "B" : "A";
+  if (kind === "award") S.state.scores[team] += 1;
+  if (kind === "steal") S.state.scores[other] += 1;
+  if (kind === "penalty") S.state.scores[team] -= 1;
+  endTurn(kind === "no-point" ? "Challenge upheld — no point" : "Leader ruled: " + kind);
+}
+
+async function ensureCam() {
+  if (S.localStream) return S.localStream;
+  S.localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+  return S.localStream;
+}
+function answerCall(call) {
+  ensureCam().then(stream => { call.answer(stream); watch(call); }).catch(() => call.answer());
+}
+function watch(call) {
+  call.on("stream", stream => {
+    S.remote = stream;
+    const v = document.getElementById("stageVideo");
+    if (v) v.srcObject = stream;
+  });
+}
+async function attachVideo() {
+  const v = document.getElementById("stageVideo");
+  if (!v || !S.state?.turn) return;
+  const m = me(S.state);
+  if (!m) return;
+  if (m.id === S.state.turn.actorId && S.state.turn.mode !== "pictionary") {
+    try { v.srcObject = await ensureCam(); v.muted = true; } catch (e) { S.state.banner = "Camera blocked — drawing still works"; }
+    return;
+  }
+  const actor = S.state.players.find(p => p.id === S.state.turn.actorId);
+  if (!actor?.peerId || !S.peer || S.calls.has(actor.peerId)) {
+    if (S.remote) v.srcObject = S.remote;
+    return;
+  }
+  try {
+    const stream = await ensureCam().catch(() => null);
+    const call = S.peer.call(actor.peerId, stream || new MediaStream());
+    S.calls.set(actor.peerId, call);
+    watch(call);
+  } catch (e) {}
+}
+
+function bindPad(pad) {
+  const ctx = pad.getContext("2d");
+  const pos = e => {
+    const r = pad.getBoundingClientRect();
+    const src = e.touches ? e.touches[0] : e;
+    return {x: (src.clientX-r.left)/r.width, y:(src.clientY-r.top)/r.height};
+  };
+  const down = e => { S.drawing = true; S.stroke = {color:S.color, size:S.size, pts:[pos(e)]}; };
+  const move = e => { if (!S.drawing) return; S.stroke.pts.push(pos(e)); paintStroke(ctx, S.stroke); };
+  const up = () => { if (!S.drawing) return; S.drawing = false; send({t:"stroke", stroke:S.stroke}); };
+  pad.onpointerdown = down; pad.onpointermove = move; pad.onpointerup = up; pad.onpointerleave = up;
+}
+function paint() {
+  const pad = document.getElementById("pad");
+  if (!pad || !S.state) return;
+  const ctx = pad.getContext("2d");
+  ctx.fillStyle = "#f7f1e6"; ctx.fillRect(0,0,pad.width,pad.height);
+  (S.state.strokes||[]).forEach(s => paintStroke(ctx, s));
+  if (S.stroke && S.drawing) paintStroke(ctx, S.stroke);
+}
+function paintStroke(ctx, s) {
+  if (!s?.pts?.length) return;
+  ctx.strokeStyle = s.color; ctx.lineWidth = s.size * 2; ctx.lineCap = "round"; ctx.beginPath();
+  s.pts.forEach((p,i) => { const x=p.x*ctx.canvas.width, y=p.y*ctx.canvas.height; i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+  ctx.stroke();
+}
+
+setInterval(() => {
+  const t = document.getElementById("timer");
+  if (!t || !S.state?.turn || S.state.phase!=="play") return;
+  const left = Math.max(0, Math.ceil((S.state.turn.endsAt - Date.now())/1000));
+  t.textContent = left;
+  if (S.role==="host" && left===0) endTurn("Time");
+}, 250);
+
+window.addEventListener("error", (e) => {
+  const n = document.getElementById("gateErr");
+  if (n) n.textContent = e.message || "Script error";
+});
+render();
+</script>
+</body>
+</html>
