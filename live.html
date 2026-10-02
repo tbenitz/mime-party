@@ -70,7 +70,15 @@ const uid = () => crypto.randomUUID();
 function saved(k, v){ if (v === undefined) return localStorage.getItem(k)||""; localStorage.setItem(k,v); }
 const ME = saved("mp-id") || (saved("mp-id", uid()), saved("mp-id"));
 const S = { role:null, room:"", mq:null, state:null, mode:"charades", color:"#1a1714", drawing:false, stroke:null, pcs:{} };
-function esc(s){ return String(s??"").replace(/[&<>"']/g, c => ({"&":"&","<":"<",">":">","\"":""","'":"&#39;"}[c])); }
+function esc(s){
+  return String(s ?? "").replace(/[&<>"']/g, c => {
+    if (c === "&") return "&" + "amp;";
+    if (c === "<") return "&" + "lt;";
+    if (c === ">") return "&" + "gt;";
+    if (c === '"') return "&" + "quot;";
+    return "&" + "#39;";
+  });
+}
 function root(){ return document.getElementById("root"); }
 function err(t){ const n=document.getElementById("gateErr"); if(n) n.textContent=t; }
 function me(st){ return st && st.players.find(p => p.id===ME); }
