@@ -139,7 +139,14 @@ const store = {
 function saveName(n) { localStorage.setItem("mp-name", n); }
 function saveRoom(r) { localStorage.setItem("mp-room", r); }
 
-const S = {
+const PEER_OPTS = {
+  host: "0.peerjs.com",
+  port: 443,
+  path: "/peerjs",
+  secure: true,
+  key: "peerjs",
+  debug: 0
+};
   role: null, room: "", peer: null, conn: null, conns: new Map(), calls: new Map(),
   localStream: null, name: store.name, playerId: store.playerId,
   state: null, modePick: "charades", color: "#1a1714", size: 4, drawing: false, stroke: null,
@@ -302,6 +309,7 @@ function bindGate() {
     const name = document.getElementById("name").value.trim();
     if (!name) return err("Name yourself first.");
     S.name = name; saveName(name);
+    err("Opening room…");
     const code = Math.random().toString(36).slice(2,7).toUpperCase();
     hostRoom(code);
   };
@@ -310,14 +318,31 @@ function bindGate() {
     const code = document.getElementById("code").value.trim().toUpperCase();
     if (!name || code.length < 4) return err("Name and a room code.");
     S.name = name; saveName(name);
+    err("Joining " + code + "…");
     joinRoom(code, document.getElementById("team").value);
   };
 }
-function err(t) { const n = document.getElementById("gateErr"); if (n) n.textContent = t; }
+function prettyPeerError(e) {
+  const type = e && e.type;
+  if (type === "peer-unavailable") return "Room is not open. The host has to create the party first, then you join that code.";
+  if (type === "unavailable-id") return "That room code is already live in another tab. Close the other host tab, or create a new party.";
+  if (type === "network" || type === "server-error" || type === "socket-error") return "Could not reach the introduction server (PeerJS). Refresh and try again.";
+  return (e && e.message) || "Connection failed.";
+}
+function err(t) {
+  const n = document.getElementById("gateErr");
+  if (n) n.textContent = t;
+  else {
+    const b = document.createElement("div");
+    b.className = "banner";
+    b.textContent = t;
+    document.getElementById("root").prepend(b);
+  }
+}
 
 function hostRoom(code) {
   S.role = "host"; S.room = code; saveRoom(code);
-  const peer = new Peer("mp" + code.toLowerCase(), {debug:0});
+  const peer = new Peer("mp" + code.toLowerCase(), PEER_OPTS);
   S.peer = peer;
   peer.on("open", () => {
     S.state = freshState();
@@ -326,7 +351,7 @@ function hostRoom(code) {
   });
   peer.on("connection", conn => wireGuest(conn));
   peer.on("call", call => answerCall(call));
-  peer.on("error", e => err(e.message || "Could not open the room. Try another code."));
+  peer.on("error", e => err(prettyPeerError(e)));
 }
 
 function freshState() {
@@ -405,7 +430,7 @@ function viewFor(st, p) {
 
 function joinRoom(code, teamPref) {
   S.role = "guest"; S.room = code; saveRoom(code);
-  const peer = new Peer(undefined, {debug:0});
+  const peer = new Peer(undefined, PEER_OPTS);
   S.peer = peer;
   peer.on("open", () => {
     const conn = peer.connect("mp"+code.toLowerCase(), {reliable:true});
@@ -418,7 +443,7 @@ function joinRoom(code, teamPref) {
     conn.on("close", () => { S.state = S.state || {banner:""}; if (S.state) S.state.banner = "Disconnected — rejoining"; render(); setTimeout(()=>joinRoom(code, teamPref), 1200); });
   });
   peer.on("call", call => answerCall(call));
-  peer.on("error", e => err(e.message || "Could not join. Check the code."));
+  peer.on("error", e => err(prettyPeerError(e)));
 }
 
 function send(msg) {
