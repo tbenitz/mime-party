@@ -145,8 +145,9 @@ const PEER_OPTS = {
   path: "/peerjs",
   secure: true,
   key: "peerjs",
-  debug: 0
+  debug: 1
 };
+const S = {
   role: null, room: "", peer: null, conn: null, conns: new Map(), calls: new Map(),
   localStream: null, name: store.name, playerId: store.playerId,
   state: null, modePick: "charades", color: "#1a1714", size: 4, drawing: false, stroke: null,
@@ -171,6 +172,7 @@ function render() {
   if (!S.state) {
     meta.textContent = "4–20 players · no game server";
     root().innerHTML = gateHTML();
+    bindGate();
     return;
   }
   const st = S.state;
@@ -603,6 +605,10 @@ setInterval(() => {
   if (S.role==="host" && left===0) endTurn("Time");
 }, 250);
 
+window.addEventListener("error", (e) => {
+  const n = document.getElementById("gateErr");
+  if (n) n.textContent = e.message || "Script error";
+});
 render();
 </script>
 </body>
